@@ -11,11 +11,12 @@ export class Renderer {
         
         // Graphics Colors
         this.colors = {
-            [this.map.TILES.WATER]: '#3b82f6', // Bright Blue
-            [this.map.TILES.LAND]: '#86efac',  // Light Green
-            [this.map.TILES.ROAD]: '#94a3b8',  // Light Gray
-            [this.map.TILES.RAIL]: '#475569',  // Dark Gray slate
-            [this.map.TILES.FOREST]: '#166534' // Dark Green
+            WATER: '#3b82f6',
+            LAND: '#dcfce7', // Lighter, seamless grass
+            ROAD: '#64748b', // Smooth Asphalt
+            RAIL: '#475569',
+            FOREST_BASE: '#166534',
+            FOREST_LIGHT: '#22c55e'
         };
         
         this.hoverX = -1;
@@ -23,15 +24,15 @@ export class Renderer {
         
         // Zoom
         this.scale = 1.0;
-        this.minScale = 0.5;
+        this.minScale = 0.05;
         this.maxScale = 3.0;
     }
 
     resize(w, h) {
-        // Center the map initially if needed, or just keep offset
-        const ts = this.tileSize * this.scale;
-        this.offsetX = (w - this.map.width * ts) / 2;
-        this.offsetY = (h - this.map.height * ts) / 2;
+        if (this.offsetX === 0 && this.offsetY === 0) {
+            this.offsetX = w / 2;
+            this.offsetY = h / 2;
+        }
     }
 
     setHover(gx, gy) {
@@ -42,24 +43,14 @@ export class Renderer {
     pan(dx, dy) {
         this.offsetX += dx;
         this.offsetY += dy;
-        // Optional: Clamp panning so map doesn't disappear?
     }
     
     zoom(delta, centerScreenX, centerScreenY) {
         const oldScale = this.scale;
         let newScale = oldScale - delta * 0.001;
-        
-        // Clamp
         newScale = Math.max(this.minScale, Math.min(this.maxScale, newScale));
         
         if (newScale === oldScale) return;
-        
-        // Zoom towards mouse:
-        // worldX = (screenX - offsetX) / oldScale
-        // newOffsetX = screenX - worldX * newScale
-        
-        // Note: My world coords are pixels * scale.
-        // realWorldX = (centerScreenX - this.offsetX) / oldScale;
         
         const worldX = (centerScreenX - this.offsetX) / oldScale;
         const worldY = (centerScreenY - this.offsetY) / oldScale;
@@ -71,8 +62,8 @@ export class Renderer {
     }
 
     draw(timestamp = 0) {
-        // Clear screen
-        this.ctx.fillStyle = '#0f172a'; 
+        // Clear screen with water color (background is water)
+        this.ctx.fillStyle = this.colors.WATER; 
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
         const ts = this.tileSize * this.scale;
@@ -80,94 +71,102 @@ export class Renderer {
         // Visible Range Calculation
         const startX = Math.floor(-this.offsetX / ts);
         const startY = Math.floor(-this.offsetY / ts);
-        const endX = startX + Math.ceil(this.canvas.width / ts) + 1;
-        const endY = startY + Math.ceil(this.canvas.height / ts) + 1;
-
-        const xMin = Math.max(0, startX);
-        const yMin = Math.max(0, startY);
-        const xMax = Math.min(this.map.width, endX);
-        const yMax = Math.min(this.map.height, endY);
-
-        // Render Loop
-        // We pass the effective tilesize (ts) to draw methods or use render context transformation?
-        // Let's pass 'ts' as an argument or just calculate drawX/drawY using it.
-        // Actually, many draw methods use 'this.tileSize'. I should temporarily override it 
-        // or refactor draw methods to take size.
-        // Simplest refactor without changing everything: Scale Context?
-        // If I scale context, I need to handle lineWidths etc. 
-        // Better: Pass 'ts' to helper methods or update them to use 'drawX, drawY, w, h'
         
-        // Let's go with updating the draw loop to pass width/height
+        const widthTiles = Math.ceil(this.canvas.width / ts) + 1;
+        const heightTiles = Math.ceil(this.canvas.height / ts) + 1;
         
-        for (let y = yMin; y < yMax; y++) {
-            for (let x = xMin; x < xMax; x++) {
+        const endX = startX + widthTiles;
+        const endY = startY + heightTiles;
+
+        // --- Layer 1: Land Mass ---
+        // To make it look "one piece", we just draw connected squares without borders
+        // Ideally we would march squares, but for now simple seamless blocks work if colors match perfectly.
+        this.ctx.fillStyle = this.colors.LAND;
+        this.ctx.beginPath();
+        for (let y = startY; y < endY; y++) {
+            for (let x = startX; x < endX; x++) {
                 const tile = this.map.getTile(x, y);
-                const drawX = Math.floor(this.offsetX + x * ts);
-                const drawY = Math.floor(this.offsetY + y * ts);
-
-                // --- Base Layer ---
-                if (tile === this.map.TILES.WATER) {
-                    this.drawWater(drawX, drawY, ts, x, y, timestamp);
-                } else {
-                    this.drawLand(drawX, drawY, ts, x, y);
+                if (tile !== this.map.TILES.WATER) {
+                    // Draw land rect, slightly overlapped to prevent cracks
+                    const drawX = this.offsetX + x * ts;
+                    const drawY = this.offsetY + y * ts;
+                    this.ctx.rect(drawX, drawY, ts + 0.5, ts + 0.5);
                 }
+            }
+        }
+        this.ctx.fill();
 
-                // --- Object Layer ---
+        // --- Layer 2: Infrastructure (Roads, Rails) ---
+        // We render these as connected paths
+        for (let y = startY; y < endY; y++) {
+            for (let x = startX; x < endX; x++) {
+                const tile = this.map.getTile(x, y);
+                const drawX = this.offsetX + x * ts;
+                const drawY = this.offsetY + y * ts;
+
                 if (tile === this.map.TILES.ROAD) {
-                     this.drawRoadAuto(drawX, drawY, ts, x, y);
+                    this.drawRoadSmooth(drawX, drawY, ts, x, y);
                 } else if (tile === this.map.TILES.RAIL) {
-                    this.drawRailAuto(drawX, drawY, ts, x, y);
-                } else if (tile === this.map.TILES.FOREST) {
-                    this.drawForestDetail(drawX, drawY, ts, x, y, timestamp);
-                } else if (tile === this.map.TILES.RESIDENTIAL) {
-                    this.drawBuilding(drawX, drawY, ts, '#fca5a5', '#b91c1c', 1); // Red theme
-                } else if (tile === this.map.TILES.COMMERCIAL) {
-                    this.drawBuilding(drawX, drawY, ts, '#93c5fd', '#1d4ed8', 2); // Blue theme
-                } else if (tile === this.map.TILES.INDUSTRIAL) {
-                    this.drawBuilding(drawX, drawY, ts, '#fbbf24', '#b45309', 3); // Yellow/Orange theme
+                    this.drawRailSmooth(drawX, drawY, ts, x, y);
                 }
-                
-                // Grid (Very suble)
-                // this.ctx.strokeStyle = 'rgba(0,0,0,0.03)';
-                // this.ctx.strokeRect(drawX, drawY, this.tileSize, this.tileSize);
             }
         }
 
-        // Draw Cursor Highlight
-        // const ts = this.tileSize * this.scale; // Already declared
+        // --- Layer 3: Objects/Buildings ---
+        for (let y = startY; y < endY; y++) {
+            for (let x = startX; x < endX; x++) {
+                const tile = this.map.getTile(x, y);
+                const drawX = this.offsetX + x * ts;
+                const drawY = this.offsetY + y * ts;
 
-        
-        if (this.hoverX >= 0 && this.hoverX < this.map.width &&
-            this.hoverY >= 0 && this.hoverY < this.map.height) {
-            
-            const hlX = Math.floor(this.offsetX + this.hoverX * ts);
-            const hlY = Math.floor(this.offsetY + this.hoverY * ts);
-            
-            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-            this.ctx.fillRect(hlX, hlY, ts, ts);
-            this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-            this.ctx.lineWidth = 2 * this.scale;
-            this.ctx.strokeRect(hlX, hlY, ts, ts);
+                if (tile === this.map.TILES.FOREST) {
+                    this.drawForestSmooth(drawX, drawY, ts, x, y, timestamp);
+                } else if (tile === this.map.TILES.RESIDENTIAL) {
+                    this.drawBuildingSmooth(drawX, drawY, ts, x, y, '#fca5a5', '#ef4444');
+                } else if (tile === this.map.TILES.COMMERCIAL) {
+                    this.drawBuildingSmooth(drawX, drawY, ts, x, y, '#93c5fd', '#3b82f6');
+                } else if (tile === this.map.TILES.INDUSTRIAL) {
+                    this.drawBuildingSmooth(drawX, drawY, ts, x, y, '#fde047', '#eab308');
+                }
+            }
         }
 
-        // Draw Selection Box
+        // --- Layer 4: UI/Highlights ---
+        
+        // Hover
+        if (true) {
+            const hx = Math.floor(this.offsetX + this.hoverX * ts);
+            const hy = Math.floor(this.offsetY + this.hoverY * ts);
+            
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            this.ctx.beginPath();
+            this.ctx.roundRect(hx, hy, ts, ts, ts * 0.2); // Rounded cursor
+            this.ctx.fill();
+            this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+            this.ctx.lineWidth = 2 * this.scale;
+            this.ctx.stroke();
+        }
+
+        // Selection
         if (this.selectionStart && this.selectionEnd) {
              const x1 = Math.min(this.selectionStart.x, this.selectionEnd.x);
              const x2 = Math.max(this.selectionStart.x, this.selectionEnd.x);
              const y1 = Math.min(this.selectionStart.y, this.selectionEnd.y);
              const y2 = Math.max(this.selectionStart.y, this.selectionEnd.y);
              
-             const sx = Math.floor(this.offsetX + x1 * ts);
-             const sy = Math.floor(this.offsetY + y1 * ts);
+             const sx = this.offsetX + x1 * ts;
+             const sy = this.offsetY + y1 * ts;
              const w = (x2 - x1 + 1) * ts;
              const h = (y2 - y1 + 1) * ts;
              
-             this.ctx.fillStyle = 'rgba(255, 100, 100, 0.3)'; // Semi-transparent selection
-             this.ctx.fillRect(sx, sy, w, h);
-             
-             this.ctx.strokeStyle = '#ef4444'; // Red border
+             this.ctx.fillStyle = 'rgba(50, 150, 255, 0.3)';
+             this.ctx.strokeStyle = '#3b82f6';
              this.ctx.lineWidth = 2 * this.scale;
-             this.ctx.strokeRect(sx, sy, w, h);
+             
+             this.ctx.beginPath();
+             this.ctx.roundRect(sx, sy, w, h, ts * 0.2);
+             this.ctx.fill();
+             this.ctx.stroke();
         }
     }
     
@@ -176,29 +175,8 @@ export class Renderer {
         this.selectionEnd = end;
     }
     
-    // --- Detailed Drawing Methods ---
-
-    drawWater(dx, dy, size, x, y, time) {
-        this.ctx.fillStyle = this.colors[this.map.TILES.WATER];
-        this.ctx.fillRect(dx, dy, size + 1, size + 1);
-        
-        const offset = (x + y) * 500 + time;
-        const wave = Math.sin(offset * 0.002);
-        if (wave > 0.8) {
-            this.ctx.fillStyle = 'rgba(255,255,255,0.2)';
-            const s = size * 0.3;
-             this.ctx.fillRect(dx + size/2 + Math.sin(time*0.001)*5, dy + size/2, s, s/2);
-        }
-    }
-
-    drawLand(dx, dy, size, x, y) {
-        this.ctx.fillStyle = this.colors[this.map.TILES.LAND];
-        this.ctx.fillRect(dx, dy, size + 1, size + 1);
-    }
-    
     getNeighbors(x, y, type) {
-        // Same as before
-        const n = [0, 0, 0, 0];
+        const n = [0, 0, 0, 0]; // Up, Right, Down, Left
         if (this.map.getTile(x, y-1) === type) n[0] = 1;
         if (this.map.getTile(x+1, y) === type) n[1] = 1;
         if (this.map.getTile(x, y+1) === type) n[2] = 1;
@@ -206,149 +184,150 @@ export class Renderer {
         return n;
     }
 
-    drawRoadAuto(dx, dy, size, x, y) {
+    drawRoadSmooth(dx, dy, size, x, y) {
         const n = this.getNeighbors(x, y, this.map.TILES.ROAD);
-        const roadColor = this.colors[this.map.TILES.ROAD];
-        const half = size / 2;
-        const roadW = size * 0.6;
-        const offset = (size - roadW) / 2;
+        const cx = dx + size / 2;
+        const cy = dy + size / 2;
+        const rW = size * 0.5; // Road width
 
-        this.ctx.fillStyle = roadColor;
-        this.ctx.fillRect(dx + offset, dy + offset, roadW, roadW);
+        this.ctx.lineCap = 'round';
+        this.ctx.lineJoin = 'round';
+        
+        // Draw Border (Outline)
+        this.ctx.strokeStyle = '#475569'; // Darker border
+        this.ctx.lineWidth = rW + 4 * this.scale;
+        this.drawRoadPath(cx, cy, size, n);
+        this.ctx.stroke();
 
-        if (n[0]) this.ctx.fillRect(dx + offset, dy, roadW, offset + 1);
-        if (n[1]) this.ctx.fillRect(dx + offset + roadW - 1, dy + offset, offset + 1, roadW);
-        if (n[2]) this.ctx.fillRect(dx + offset, dy + offset + roadW - 1, roadW, offset + 1);
-        if (n[3]) this.ctx.fillRect(dx, dy + offset, offset + 1, roadW);
+        // Draw Pavement
+        this.ctx.strokeStyle = this.colors.ROAD;
+        this.ctx.lineWidth = rW;
+        this.drawRoadPath(cx, cy, size, n);
+        this.ctx.stroke();
         
-        this.ctx.fillStyle = '#f8fafc';
-        const dashW = 4 * this.scale;
-        const dashL = 8 * this.scale;
-        
+        // Center Lines
         if ((n[0] && n[2]) || (!n[1] && !n[3])) {
-            this.ctx.fillRect(dx + half - dashW/2, dy + half - dashL/2, dashW, dashL);
-        }
-        if (n[1] && n[3]) {
-             this.ctx.fillRect(dx + half - dashL/2, dy + half - dashW/2, dashL, dashW);
+            // Vertical simple
+             this.drawDashedLine(cx, dy, cx, dy + size, size);
+        } else if (n[1] && n[3]) {
+            // Horizontal simple
+             this.drawDashedLine(dx, cy, dx + size, cy, size);
+        } else {
+            // Corner/Intersection Center Dot or mini-dashes?
+            // For now, keep it clean without complex curve dashes
         }
     }
     
-    drawRailAuto(dx, dy, size, x, y) {
+    drawRoadPath(cx, cy, size, n) {
+        // Draw a cross based on neighbors
+        this.ctx.beginPath();
+        // If no neighbors, just a dot
+        if (!n.some(v=>v)) {
+            this.ctx.moveTo(cx, cy);
+            this.ctx.lineTo(cx, cy);
+            return;
+        }
+
+        // Draw arms
+        const len = size; // Go fully to edge and beyond to overlap neighbors
+        if (n[0]) { this.ctx.moveTo(cx, cy); this.ctx.lineTo(cx, cy - len); }
+        if (n[1]) { this.ctx.moveTo(cx, cy); this.ctx.lineTo(cx + len, cy); }
+        if (n[2]) { this.ctx.moveTo(cx, cy); this.ctx.lineTo(cx, cy + len); }
+        if (n[3]) { this.ctx.moveTo(cx, cy); this.ctx.lineTo(cx - len, cy); }
+    }
+    
+    drawDashedLine(x1, y1, x2, y2, size) {
+        this.ctx.beginPath();
+        this.ctx.strokeStyle = '#e2e8f0';
+        this.ctx.lineWidth = 2 * this.scale;
+        this.ctx.setLineDash([8 * this.scale, 8 * this.scale]);
+        this.ctx.moveTo(x1, y1);
+        this.ctx.lineTo(x2, y2);
+        this.ctx.stroke();
+        this.ctx.setLineDash([]);
+    }
+
+    drawRailSmooth(dx, dy, size, x, y) {
         const n = this.getNeighbors(x, y, this.map.TILES.RAIL);
         const cx = dx + size / 2;
         const cy = dy + size / 2;
         
-        this.ctx.strokeStyle = '#cbd5e1';
-        this.ctx.lineWidth = 4 * this.scale;
-        this.ctx.lineCap = 'butt';
-        
-        this.ctx.beginPath();
-        if (n.every(v => v === 0)) {
-            this.ctx.moveTo(dx + 4*this.scale, cy);
-            this.ctx.lineTo(dx + size - 4*this.scale, cy);
-            this.drawSleepers(dx, dy, size, true);
-        } else {
-            if (n[0]) { this.ctx.moveTo(cx, cy); this.ctx.lineTo(cx, dy); }
-            if (n[1]) { this.ctx.moveTo(cx, cy); this.ctx.lineTo(dx + size, cy); }
-            if (n[2]) { this.ctx.moveTo(cx, cy); this.ctx.lineTo(cx, dy + size); }
-            if (n[3]) { this.ctx.moveTo(cx, cy); this.ctx.lineTo(dx, cy); }
-            this.ctx.stroke();
-            
-            this.ctx.strokeStyle = '#78350f';
-            this.ctx.lineWidth = 4 * this.scale;
-            this.ctx.beginPath();
-            
-            const step = size / 3;
-            // Simplified sleepers drawing for junctions
-            if (n[0]) { this.ctx.moveTo(cx - 5, dy + step); this.ctx.lineTo(cx + 5, dy + step); }
-            if (n[2]) { this.ctx.moveTo(cx - 5, dy + size - step); this.ctx.lineTo(cx + 5, dy + size - step); }
-            if (n[1]) { this.ctx.moveTo(dx + size - step, cy - 5); this.ctx.lineTo(dx + size - step, cy + 5); }
-            if (n[3]) { this.ctx.moveTo(dx + step, cy - 5); this.ctx.lineTo(dx + step, cy + 5); }
-            if (n.some(v=>v)) {
-                this.ctx.fillRect(cx - 3, cy - 3, 6, 6);
-            }
-        }
+        // Ballast (Gravel)
+        this.ctx.strokeStyle = '#78716c';
+        this.ctx.lineWidth = size * 0.6;
+        this.ctx.lineCap = 'round';
+        this.drawRoadPath(cx, cy, size, n); // Reuse path logic
         this.ctx.stroke();
         
-        this.ctx.strokeStyle = '#cbd5e1'; 
-        this.ctx.lineWidth = 3 * this.scale;
-        this.ctx.beginPath();
-        // Simplified rail lines for brevity
-        if (n[0]) { this.ctx.moveTo(cx-3, cy); this.ctx.lineTo(cx-3, dy); this.ctx.moveTo(cx+3, cy); this.ctx.lineTo(cx+3, dy); }
-        if (n[2]) { this.ctx.moveTo(cx-3, cy); this.ctx.lineTo(cx-3, dy+size); this.ctx.moveTo(cx+3, cy); this.ctx.lineTo(cx+3, dy+size); }
+        // Rails
+        this.ctx.strokeStyle = '#cbd5e1'; // Metal
+        this.ctx.lineWidth = size * 0.4;
+        this.drawRoadPath(cx, cy, size, n);
         this.ctx.stroke();
-    }
-    
-    drawSleepers(x, y, size, horizontal) {
-         this.ctx.save();
-         this.ctx.strokeStyle = '#78350f';
-         this.ctx.lineWidth = 4 * this.scale;
-         this.ctx.beginPath();
-         const sleeperCount = 3;
-         const step = size / sleeperCount;
-         
-         for(let i=0; i<sleeperCount; i++) {
-             if (horizontal) {
-                 let sx = x + i * step + step/2;
-                 this.ctx.moveTo(sx, y + size/2 - 6*this.scale);
-                 this.ctx.lineTo(sx, y + size/2 + 6*this.scale);
-             }
-         }
-         this.ctx.stroke();
-         this.ctx.restore();
+        
+        // Inner Gap
+        this.ctx.strokeStyle = '#78716c'; // Back to ballast color
+        this.ctx.lineWidth = size * 0.25;
+        this.drawRoadPath(cx, cy, size, n);
+        this.ctx.stroke();
+        
+        // Sleepers (Simulated by dashed line in gap?)
+        // Hard to do smooth sleepers on curves without complex math.
+        // Let's rely on the "track" look of double lines.
     }
 
-    drawForestDetail(dx, dy, size, x, y, time) {
-        this.ctx.fillStyle = this.colors[this.map.TILES.LAND];
-        this.ctx.fillRect(dx, dy, size+1, size+1);
+    drawForestSmooth(dx, dy, size, x, y, time) {
+        // Draw multiple trees scattered
+        const seed = (x * 3 + y * 7); // Pseudo random
+        const count = 3 + (seed % 3); 
         
-        const cx = dx + size / 2;
-        const cy = dy + size * 0.8;
-        
-        this.ctx.fillStyle = '#78350f';
-        this.ctx.fillRect(cx - 2*this.scale, cy - 8*this.scale, 4*this.scale, 8*this.scale);
-        
-        this.ctx.fillStyle = '#15803d';
-        const sway = Math.sin(time * 0.003 + x + y) * 2;
-        this.drawTriangle(cx + sway, cy - 8*this.scale, 14*this.scale);
-        this.drawTriangle(cx + sway, cy - 14*this.scale, 12*this.scale);
-        this.drawTriangle(cx + sway, cy - 20*this.scale, 10*this.scale);
-    }
-    
-    drawTriangle(x, y, w) {
-        this.ctx.beginPath();
-        this.ctx.moveTo(x - w/2, y);
-        this.ctx.lineTo(x + w/2, y);
-        this.ctx.lineTo(x, y - w*0.8);
-        this.ctx.fill();
-    }
-    
-    drawBuilding(dx, dy, size, wallColor, roofColor, type) {
-        this.ctx.fillStyle = this.colors[this.map.TILES.LAND];
-        this.ctx.fillRect(dx, dy, size+1, size+1);
-        
-        const pad = 4 * this.scale;
-        const w = size - pad*2;
-        const h = size - pad*2;
-        const x = dx + pad;
-        const y = dy + pad;
-        
-        this.ctx.fillStyle = 'rgba(0,0,0,0.2)';
-        this.ctx.fillRect(x+2*this.scale, y+2*this.scale, w, h);
-        
-        this.ctx.fillStyle = wallColor;
-        this.ctx.fillRect(x, y, w, h);
-        
-        if (type === 1) { 
-            this.ctx.fillStyle = roofColor;
-            this.ctx.beginPath();
-            this.ctx.moveTo(x, y);
-            this.ctx.lineTo(x + w/2, y - 6*this.scale);
-            this.ctx.lineTo(x + w, y);
-            this.ctx.fill();
-        } else if (type === 2) { 
-             this.ctx.fillStyle = roofColor;
-             this.ctx.fillRect(x, y, w, 4*this.scale); 
+        for(let i=0; i<count; i++) {
+             const ox = ((seed + i*13) % 10) / 10 * size;
+             const oy = ((seed + i*23) % 10) / 10 * size;
+             
+             const tx = dx + ox;
+             const ty = dy + oy;
+             
+             // Simple Circle/Blob trees
+             const r = size * 0.25 * (0.8 + Math.sin(time*0.002 + x + i)*0.2);
+             
+             this.ctx.fillStyle = this.colors.FOREST_BASE;
+             this.ctx.beginPath();
+             this.ctx.arc(tx, ty, r, 0, Math.PI*2);
+             this.ctx.fill();
+             
+             this.ctx.fillStyle = this.colors.FOREST_LIGHT;
+             this.ctx.beginPath();
+             this.ctx.arc(tx - r*0.3, ty - r*0.3, r*0.4, 0, Math.PI*2);
+             this.ctx.fill();
         }
+    }
+    
+    drawBuildingSmooth(dx, dy, size, x, y, wallColor, roofColor) {
+        // Randomize building size/pos slightly
+        const seed = (x * 123 + y * 456);
+        const w = size * (0.5 + (seed % 40)/100);
+        const h = size * (0.5 + ((seed*2) % 40)/100);
+        
+        const bx = dx + (size - w) / 2;
+        const by = dy + (size - h) / 2;
+        
+        // Shadow
+        this.ctx.fillStyle = 'rgba(0,0,0,0.1)';
+        this.ctx.beginPath();
+        this.ctx.roundRect(bx + 4*this.scale, by + 4*this.scale, w, h, 4*this.scale);
+        this.ctx.fill();
+
+        // Building
+        this.ctx.fillStyle = wallColor;
+        this.ctx.beginPath();
+        this.ctx.roundRect(bx, by, w, h, 2*this.scale);
+        this.ctx.fill();
+        
+        // Roof detail (Simple)
+        this.ctx.fillStyle = roofColor;
+        this.ctx.beginPath();
+        this.ctx.roundRect(bx + w*0.1, by + h*0.1, w*0.8, h*0.8, 2*this.scale);
+        this.ctx.fill();
     }
 }

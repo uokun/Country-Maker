@@ -11,11 +11,9 @@ export class Game {
 
     // Game Settings
     this.tileSize = 40;
-    this.mapWidth = 64;
-    this.mapHeight = 64;
 
     // Systems
-    this.map = new Map(this.mapWidth, this.mapHeight);
+    this.map = new Map(); // Infinite map
     this.renderer = new Renderer(
       this.canvas,
       this.ctx,
@@ -91,9 +89,7 @@ export class Game {
   applyArea(x1, y1, x2, y2) {
       for (let y = y1; y <= y2; y++) {
           for (let x = x1; x <= x2; x++) {
-              if (x >= 0 && x < this.mapWidth && y >= 0 && y < this.mapHeight) {
-                  this.applyTool(x, y);
-              }
+              this.applyTool(x, y);
           }
       }
   }
