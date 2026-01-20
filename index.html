@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Country Maker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Noto+Sans+JP:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏝️</text></svg>"
+    />
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="gameCanvas"></canvas>
+
+      <div id="ui-container">
+            <header class="game-header">
+                <h1>Country Maker</h1>
+                <div class="population-counter">
+                    <span>👥</span>
+                    <span id="pop-main">0</span>
+                    <small>人</small>
+                </div>
+            </header>
+            
+            <div class="dock-container">
+                <div class="toolbar">
+                    <div class="tool-group">
+                        <button class="tool-btn active" data-tool="cursor" title="選択・移動">
+                            <span class="icon">👆</span>
+                        </button>
+                    </div>
+                    
+                    <div class="tool-group">
+                        <button class="tool-btn" data-tool="land" title="造成 (陸地)">
+                            <span class="icon">🟩</span>
+                        </button>
+                        <button class="tool-btn" data-tool="water" title="整地 (海)">
+                            <span class="icon">🌊</span>
+                        </button>
+                        <button class="tool-btn" data-tool="forest" title="植林">
+                            <span class="icon">🌲</span>
+                        </button>
+                    </div>
+                    
+                    <div class="tool-group">
+                        <button class="tool-btn" data-tool="road" title="道路">
+                            <span class="icon">🛣️</span>
+                        </button>
+                        <button class="tool-btn" data-tool="rail" title="線路">
+                            <span class="icon">🛤️</span>
+                        </button>
+                    </div>
+                    
+                    <div class="tool-group">
+                        <button class="tool-btn" data-tool="residential" title="住宅区画">
+                            <span class="icon">🏠</span>
+                        </button>
+                        <button class="tool-btn" data-tool="commercial" title="商業区画">
+                            <span class="icon">🏢</span>
+                        </button>
+                        <button class="tool-btn" data-tool="industrial" title="工業区画">
+                            <span class="icon">🏭</span>
+                        </button>
+                    </div>
+
+                    <div class="tool-group actions">
+                        <button class="action-btn" id="btn-save" title="保存">
+                            <span class="icon">💾</span>
+                        </button>
+                        <button class="action-btn" id="btn-clear" title="全消去">
+                            <span class="icon">🗑️</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="status-bar">
+                <span id="coords-display">X: 0, Y: 0</span>
+                <span id="tool-display" style="margin-left: 10px;">ツール: 選択</span>
+            </div>
+      </div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,200 @@
+:root {
+  --bg-glass: rgba(20, 20, 25, 0.75);
+  --border-glass: rgba(255, 255, 255, 0.1);
+  --text-primary: #ffffff;
+  --text-secondary: #aaaaaa;
+  --accent: #4cc9f0;
+  --accent-hover: #3a9bbd;
+  --tool-active-bg: rgba(76, 201, 240, 0.2);
+  --tool-active-border: #4cc9f0;
+  --font-main: "Inter", "Noto Sans JP", sans-serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  user-select: none;
+}
+
+body,
+html {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #0f172a; /* Deep ocean dark blue as fallback */
+  font-family: var(--font-main);
+  color: var(--text-primary);
+}
+
+#app {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
+
+#ui-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* Let clicks pass through to canvas */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 0;
+    overflow: hidden;
+}
+
+/* Header slightly different for Cities style */
+.game-header {
+    pointer-events: auto;
+    margin: 1rem;
+    background: var(--bg-glass);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--border-glass);
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    align-self: flex-start;
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.game-header h1 {
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  background: linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.population-counter {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    border-left: 1px solid var(--border-glass);
+    padding-left: 1rem;
+    color: #4cc9f0;
+}
+
+/* Bottom Dock Area */
+.dock-container {
+    pointer-events: auto;
+    width: 100%;
+    padding: 1rem;
+    background: linear-gradient(to top, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.6) 80%, transparent);
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    gap: 1rem;
+}
+
+.toolbar {
+    background: var(--bg-glass);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border-glass);
+    border-radius: 12px;
+    padding: 0.5rem;
+    display: flex;
+    gap: 0.5rem;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    overflow-x: auto;
+    max-width: 90%;
+}
+
+.tool-group {
+    display: flex;
+    gap: 0.25rem;
+    padding: 0 0.5rem;
+    position: relative;
+    align-items: center;
+}
+
+.tool-group:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 20%;
+    height: 60%;
+    width: 1px;
+    background: var(--border-glass);
+}
+
+.tool-btn, .action-btn {
+    width: 50px;
+    height: 50px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.tool-btn span.icon {
+    font-size: 1.5rem;
+    margin-bottom: 2px;
+}
+
+.tool-btn:hover, .action-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-4px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.tool-btn.active {
+    background: var(--tool-active-bg);
+    border-color: var(--tool-active-border);
+    box-shadow: 0 0 15px rgba(76, 201, 240, 0.25);
+    transform: translateY(-4px);
+}
+
+/* Tooltip on hover (simple CSS only solution) */
+.tool-btn::before {
+    content: attr(title);
+    position: absolute;
+    top: -35px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.8);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+}
+.tool-btn:hover::before {
+    opacity: 1;
+}
+
+.status-bar {
+    position: absolute;
+    bottom: 0.5rem;
+    right: 1rem;
+    background: transparent;
+    border: none;
+    font-size: 0.75rem;
+    pointer-events: none;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
