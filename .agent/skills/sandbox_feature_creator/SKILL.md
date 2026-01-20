@@ -68,6 +68,8 @@ switch (this.activeTool) {
 
 開発の最後に、`PATCH_NOTES.md` に変更内容を追記してください。**内容は日本語で記述してください。**
 
+**重要: 既存のバージョンに追記せず、毎回必ず新しいバージョン番号の見出しを作成してください。**
+
 ```markdown
 ## v[MAJOR].[MINOR].[PATCH] - [YYYY-MM-DD] - [機能名] 追加
 

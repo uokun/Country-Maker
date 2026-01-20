@@ -73,15 +73,29 @@ export class Game {
   }
 
   // Called by Input module
-  onTileClick(gridX, gridY) {
-    this.applyTool(gridX, gridY);
+  setSelection(start, end) {
+      this.renderer.setSelectionBox(start, end);
   }
 
-  // Called when dragging
-  onTileDrag(gridX, gridY) {
-    // Some tools work on drag (Paint), some might not (Buildings, maybe?)
-    // For now, allow painting everything
-    this.applyTool(gridX, gridY);
+  onAreaSelect(start, end) {
+      if (!start || !end) return;
+      
+      const x1 = Math.min(start.x, end.x);
+      const x2 = Math.max(start.x, end.x);
+      const y1 = Math.min(start.y, end.y);
+      const y2 = Math.max(start.y, end.y);
+
+      this.applyArea(x1, y1, x2, y2);
+  }
+
+  applyArea(x1, y1, x2, y2) {
+      for (let y = y1; y <= y2; y++) {
+          for (let x = x1; x <= x2; x++) {
+              if (x >= 0 && x < this.mapWidth && y >= 0 && y < this.mapHeight) {
+                  this.applyTool(x, y);
+              }
+          }
+      }
   }
 
   applyTool(x, y) {

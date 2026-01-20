@@ -9,6 +9,10 @@ export class Input {
         this.isPanning = false;
         this.lastMouseX = 0;
         this.lastMouseY = 0;
+
+        // Selection State
+        this.selectionStart = null; // {x, y}
+        this.selectionEnd = null;   // {x, y}
         
         this.keys = {}; // Track active keys
 
@@ -62,8 +66,13 @@ export class Input {
                 this.lastMouseY = e.clientY;
                 this.canvas.style.cursor = 'grabbing';
             } else {
+                // Start Selection
                 this.isDragging = true;
-                this.game.onTileClick(gridX, gridY);
+                this.selectionStart = { x: gridX, y: gridY };
+                this.selectionEnd = { x: gridX, y: gridY };
+                // Also trigger single click immediately? No, wait for up or just start region.
+                // Usually builders show the box first.
+                // But for single click feeling, we can just apply on 'up' if same tile.
             }
         }
     }
@@ -79,7 +88,11 @@ export class Input {
         if(display) display.textContent = `X: ${gridX}, Y: ${gridY}`;
 
         if (this.isDragging) {
-            this.game.onTileDrag(gridX, gridY);
+             if (this.game.activeTool !== 'cursor') {
+                 this.selectionEnd = { x: gridX, y: gridY };
+                 // Pass selection to renderer for drawing
+                 this.game.setSelection(this.selectionStart, this.selectionEnd);
+             }
         }
         
         if (this.isPanning) {
@@ -92,6 +105,18 @@ export class Input {
     }
 
     onMouseUp(e) {
+        if (this.isDragging && this.game.activeTool !== 'cursor') {
+            const { gridX, gridY } = this.getGridCoords(e);
+            this.selectionEnd = { x: gridX, y: gridY };
+            
+            this.game.onAreaSelect(this.selectionStart, this.selectionEnd);
+            
+            // Reset
+            this.selectionStart = null;
+            this.selectionEnd = null;
+            this.game.setSelection(null, null);
+        }
+
         this.isDragging = false;
         this.isPanning = false;
         this.canvas.style.cursor = 'crosshair';
