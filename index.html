@@ -21,71 +21,149 @@
       <canvas id="gameCanvas"></canvas>
 
       <div id="ui-container">
-            <header class="game-header">
-                <h1>Country Maker</h1>
-                <div class="population-counter">
-                    <span>👥</span>
-                    <span id="pop-main">0</span>
-                    <small>人</small>
-                </div>
-            </header>
-            
-            <div class="dock-container">
-                <div class="toolbar">
-                    <div class="tool-group">
-                        <button class="tool-btn active" data-tool="cursor" title="選択・移動">
-                            <span class="icon">👆</span>
-                        </button>
-                    </div>
-                    
-                    <div class="tool-group">
-                        <button class="tool-btn" data-tool="land" title="造成 (陸地)">
-                            <span class="icon">🟩</span>
-                        </button>
-                        <button class="tool-btn" data-tool="water" title="整地 (海)">
-                            <span class="icon">🌊</span>
-                        </button>
-                        <button class="tool-btn" data-tool="forest" title="植林">
-                            <span class="icon">🌲</span>
-                        </button>
-                    </div>
-                    
-                    <div class="tool-group">
-                        <button class="tool-btn" data-tool="road" title="道路">
-                            <span class="icon">🛣️</span>
-                        </button>
-                        <button class="tool-btn" data-tool="rail" title="線路">
-                            <span class="icon">🛤️</span>
-                        </button>
-                    </div>
-                    
-                    <div class="tool-group">
-                        <button class="tool-btn" data-tool="residential" title="住宅区画">
-                            <span class="icon">🏠</span>
-                        </button>
-                        <button class="tool-btn" data-tool="commercial" title="商業区画">
-                            <span class="icon">🏢</span>
-                        </button>
-                        <button class="tool-btn" data-tool="industrial" title="工業区画">
-                            <span class="icon">🏭</span>
-                        </button>
-                    </div>
+        <header class="game-header">
+          <h1>Country Maker</h1>
+          <div class="population-counter">
+            <span>👥</span>
+            <span id="pop-main">0</span>
+            <small>人</small>
+          </div>
+        </header>
 
-                    <div class="tool-group actions">
-                        <button class="action-btn" id="btn-save" title="保存">
-                            <span class="icon">💾</span>
-                        </button>
-                        <button class="action-btn" id="btn-clear" title="全消去">
-                            <span class="icon">🗑️</span>
-                        </button>
-                    </div>
+        <div class="dock-container">
+          <div class="toolbar">
+            <div class="tool-group">
+              <button
+                class="tool-btn active"
+                data-tool="cursor"
+                title="選択・移動"
+              >
+                <span class="icon">👆</span>
+              </button>
+            </div>
+
+            <div class="tool-group">
+              <div class="tool-dropdown-wrapper">
+                <div class="tool-btn main-icon">
+                  <span class="icon">⛰️</span>
                 </div>
+                <div class="tool-dropdown-content">
+                  <button class="tool-btn" data-tool="land" title="多角形造成">
+                    <span class="icon">⬢</span>
+                  </button>
+                  <button class="tool-btn" data-tool="brush" title="ブラシ造成">
+                    <span class="icon">🖌️</span>
+                  </button>
+                  <button class="tool-btn" data-tool="water" title="整地 (海)">
+                    <span class="icon">🌊</span>
+                  </button>
+                </div>
+              </div>
+              <button class="tool-btn" data-tool="forest" title="植林">
+                <span class="icon">🌲</span>
+              </button>
             </div>
-            
-            <div class="status-bar">
-                <span id="coords-display">X: 0, Y: 0</span>
-                <span id="tool-display" style="margin-left: 10px;">ツール: 選択</span>
+
+            <div class="tool-group">
+              <button class="tool-btn" data-tool="road" title="道路">
+                <span class="icon">🛣️</span>
+              </button>
+              <button class="tool-btn" data-tool="rail" title="線路">
+                <span class="icon">🛤️</span>
+              </button>
             </div>
+
+            <div class="tool-group">
+              <button class="tool-btn" data-tool="residential" title="住宅区画">
+                <span class="icon">🏠</span>
+              </button>
+              <button class="tool-btn" data-tool="commercial" title="商業区画">
+                <span class="icon">🏢</span>
+              </button>
+              <button class="tool-btn" data-tool="industrial" title="工業区画">
+                <span class="icon">🏭</span>
+              </button>
+            </div>
+
+            <!-- Snap Settings -->
+            <div
+              class="tool-group"
+              style="
+                padding-left: 10px;
+                border-left: 1px solid var(--border-glass);
+              "
+            >
+              <div class="snap-toggles">
+                <label class="toggle-label" title="マップの縦横軸に合わせる">
+                  <input type="checkbox" id="chk-snap-global" checked />
+                  <span>🌐</span>
+                </label>
+                <label
+                  class="toggle-label"
+                  title="直前の線に対して直角・並行に合わせる"
+                >
+                  <input type="checkbox" id="chk-snap-relative" checked />
+                  <span>📐</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="tool-group actions">
+              <button class="action-btn" id="btn-save" title="保存">
+                <span class="icon">💾</span>
+              </button>
+              <button class="action-btn" id="btn-clear" title="全消去">
+                <span class="icon">🗑️</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="status-bar">
+          <span id="coords-display">X: 0, Y: 0</span>
+          <span id="scale-display" style="margin-left: 10px">Scale: 1:1</span>
+          <div
+            id="scale-bar-container"
+            style="
+              margin-left: auto;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+            "
+          >
+            <div
+              id="scale-bar-line"
+              style="
+                width: 100px;
+                height: 2px;
+                background: white;
+                border-left: 1px solid white;
+                border-right: 1px solid white;
+              "
+            ></div>
+            <span id="scale-bar-text" style="font-size: 10px">100m</span>
+          </div>
+          <span id="tool-display" style="margin-left: 10px">ツール: 選択</span>
+        </div>
+
+        <!-- Polygon Controls (Floating) -->
+        <div id="poly-controls" class="poly-controls hidden">
+          <div class="control-sep"></div>
+          <button
+            id="btn-cancel-poly"
+            class="control-btn cancel"
+            title="キャンセル (Esc)"
+          >
+            ✖ キャンセル (Esc)
+          </button>
+          <button
+            id="btn-finish-poly"
+            class="control-btn finish"
+            title="完了 (Enter)"
+          >
+            ✔ 始点に接続 (Enter)
+          </button>
+        </div>
       </div>
     </div>
 

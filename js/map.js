@@ -1,106 +1,69 @@
 export class Map {
-    constructor() {
-        this.CHUNK_SIZE = 32;
-        this.chunks = {}; // Key format: "chunkX,chunkY" -> 2D array [y][x]
-        
-        // Define Tile Types
-        this.TILES = {
-            WATER: 0,
-            LAND: 1,
-            ROAD: 2,
-            RAIL: 3,
-            FOREST: 4,
-            RESIDENTIAL: 5,
-            COMMERCIAL: 6,
-            INDUSTRIAL: 7
-        };
+  constructor() {
+    // Store all game objects in a flat list for now (easy to iterate)
+    // types: 'road', 'building', 'tree', 'zone' (if we do zones like poly)
+    this.objects = [];
 
-        this.initialize();
-    }
+    // Define Types for reference
+    this.TYPES = {
+      ROAD: "road",
+      BUILDING: "building",
+      TREE: "tree",
+    };
 
-    initialize() {
-        // Initialize a small island around 0,0
-        const radius = 5;
-        for (let y = -radius; y <= radius; y++) {
-            for (let x = -radius; x <= radius; x++) {
-                if (x*x + y*y <= radius*radius) {
-                    this.setTile(x, y, this.TILES.LAND);
-                }
-            }
+    this.initialize();
+  }
+
+  initialize() {
+    // Start empty or with a demo setup
+  }
+
+  addObject(obj) {
+    // validation or ID generation could go here
+    this.objects.push(obj);
+  }
+
+  getObjects() {
+    return this.objects;
+  }
+
+  // Simple hit test (naive O(N))
+  // radius: how close the click needs to be
+  hitTest(x, y, radius = 10) {
+    // Check objects in reverse order (top first)
+    for (let i = this.objects.length - 1; i >= 0; i--) {
+      const obj = this.objects[i];
+
+      if (obj.type === this.TYPES.BUILDING || obj.type === this.TYPES.TREE) {
+        // Circle distance check for simplicity
+        const dx = obj.x - x;
+        const dy = obj.y - y;
+        if (Math.sqrt(dx * dx + dy * dy) < obj.size / 2) {
+          return obj;
         }
+      }
+      // For roads (lines), we need point-to-segment distance.
+      // Implement later if selecting roads is needed.
     }
+    return null;
+  }
 
-    _getChunkKey(cx, cy) {
-        return `${cx},${cy}`;
-    }
+  // Clear map
+  clear() {
+    this.objects = [];
+  }
 
-    getChunk(cx, cy, createIfMissing = false) {
-        const key = this._getChunkKey(cx, cy);
-        if (this.chunks[key]) {
-            return this.chunks[key];
-        }
-        
-        if (createIfMissing) {
-            // Create new chunk filled with WATER
-            const chunk = [];
-            for (let y = 0; y < this.CHUNK_SIZE; y++) {
-                const row = new Array(this.CHUNK_SIZE).fill(this.TILES.WATER);
-                chunk.push(row);
-            }
-            this.chunks[key] = chunk;
-            return chunk;
-        }
-        
-        return null;
-    }
+  exportData() {
+    return JSON.stringify(this.objects);
+  }
 
-    // specific helper for negative coords modulo
-    _getChunkCoords(x, y) {
-        const cx = Math.floor(x / this.CHUNK_SIZE);
-        const cy = Math.floor(y / this.CHUNK_SIZE);
-        
-        // localized x,y within the chunk (0 to CHUNK_SIZE-1)
-        let lx = x % this.CHUNK_SIZE;
-        let ly = y % this.CHUNK_SIZE;
-        
-        if (lx < 0) lx += this.CHUNK_SIZE;
-        if (ly < 0) ly += this.CHUNK_SIZE;
-        
-        return { cx, cy, lx, ly };
+  importData(jsonString) {
+    try {
+      this.objects = JSON.parse(jsonString);
+      return true;
+    } catch (e) {
+      console.error("Failed to load map data", e);
+      return false;
     }
-
-    getTile(x, y) {
-        const { cx, cy, lx, ly } = this._getChunkCoords(x, y);
-        const chunk = this.getChunk(cx, cy);
-        
-        if (chunk) {
-            return chunk[ly][lx];
-        }
-        
-        // Default to water if chunk doesn't exist
-        return this.TILES.WATER;
-    }
-
-    setTile(x, y, type) {
-        const { cx, cy, lx, ly } = this._getChunkCoords(x, y);
-        const chunk = this.getChunk(cx, cy, true); // Create if missing
-        
-        chunk[ly][lx] = type;
-        return true;
-    }
-    
-    exportData() {
-        // Simple serialization of chunks
-        return JSON.stringify(this.chunks);
-    }
-    
-    importData(jsonString) {
-        try {
-            this.chunks = JSON.parse(jsonString);
-            return true;
-        } catch (e) {
-            console.error("Failed to load map data", e);
-            return false;
-        }
-    }
+  }
 }
