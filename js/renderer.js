@@ -149,6 +149,31 @@ export class Renderer {
             this.ctx.lineWidth = 2 * this.scale;
             this.ctx.strokeRect(hlX, hlY, ts, ts);
         }
+
+        // Draw Selection Box
+        if (this.selectionStart && this.selectionEnd) {
+             const x1 = Math.min(this.selectionStart.x, this.selectionEnd.x);
+             const x2 = Math.max(this.selectionStart.x, this.selectionEnd.x);
+             const y1 = Math.min(this.selectionStart.y, this.selectionEnd.y);
+             const y2 = Math.max(this.selectionStart.y, this.selectionEnd.y);
+             
+             const sx = Math.floor(this.offsetX + x1 * ts);
+             const sy = Math.floor(this.offsetY + y1 * ts);
+             const w = (x2 - x1 + 1) * ts;
+             const h = (y2 - y1 + 1) * ts;
+             
+             this.ctx.fillStyle = 'rgba(255, 100, 100, 0.3)'; // Semi-transparent selection
+             this.ctx.fillRect(sx, sy, w, h);
+             
+             this.ctx.strokeStyle = '#ef4444'; // Red border
+             this.ctx.lineWidth = 2 * this.scale;
+             this.ctx.strokeRect(sx, sy, w, h);
+        }
+    }
+    
+    setSelectionBox(start, end) {
+        this.selectionStart = start;
+        this.selectionEnd = end;
     }
     
     // --- Detailed Drawing Methods ---
