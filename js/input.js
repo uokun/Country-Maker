@@ -330,6 +330,10 @@ export class Input {
     if (this.polyPoints.length > 0) {
       this.polyPoints.pop();
       this.isClosingLoop = false;
+      this.updatePolyUI();
+    }
+  }
+
   finishRect() {
       if (this.polyPoints.length !== 3) return;
       const p1 = this.polyPoints[0];
@@ -414,3 +418,4 @@ export class Input {
       }
       this.polyPoints = [];
   }
+}

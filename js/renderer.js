@@ -115,156 +115,339 @@ export class Renderer {
         const points = input.polyPoints;
         const mouseW = input.currentMouseWorld;
 
-        // 1. Fill Preview (Potential Shape)
-        this.ctx.fillStyle = "rgba(74, 222, 128, 0.5)"; // Semi-transparent Land
-        this.ctx.beginPath();
-        const start = this.toScreen(points[0].x, points[0].y);
-        this.ctx.moveTo(start.x, start.y);
-
-        for (let i = 1; i < points.length; i++) {
-          const p = this.toScreen(points[i].x, points[i].y);
-          this.ctx.lineTo(p.x, p.y);
-        }
-
-        // Close shape to Mouse
-        const mouseS = this.toScreen(mouseW.x, mouseW.y);
-        
-        // If closing loop, snap visual to start point
-        if (input.isClosingLoop && points.length > 0) {
-            const startS = this.toScreen(points[0].x, points[0].y);
-            this.ctx.lineTo(startS.x, startS.y);
-        } else {
-            this.ctx.lineTo(mouseS.x, mouseS.y);
-        }
-        
-        this.ctx.closePath();
-        this.ctx.fill();
-
-        // 2. Stroke Line
-        let strokeColor = "#ffffff";
-        if (input.isSnapped) {
-          if (input.snapType === "global")
-            strokeColor = "#fde047"; // Yellow
-          else if (input.snapType === "relative") strokeColor = "#22d3ee"; // Cyan
-        }
-        this.ctx.strokeStyle = strokeColor;
-        this.ctx.lineWidth = 2 * this.scale;
-        this.ctx.stroke(); // Stroke the shape we just filled
-
-        // 3. Draw Dots/Vertices
-        this.ctx.fillStyle = "#fff";
-        for (let i = 0; i < points.length; i++) {
-            const pt = points[i];
-            const s = this.toScreen(pt.x, pt.y);
-            this.ctx.beginPath();
-            
-            // Highlight start point if closing loop
-            if (i === 0 && input.isClosingLoop) {
-                this.ctx.fillStyle = "#fde047"; // Yellow highlight
-                this.ctx.arc(s.x, s.y, 8, 0, Math.PI * 2);
-                this.ctx.fill();
-                this.ctx.fillStyle = "#fff"; // Reset
-            } else {
-                this.ctx.arc(s.x, s.y, 4, 0, Math.PI * 2);
-                this.ctx.fill();
-            }
-        }
-
-        // 4. Length Labels (For ALL segments)
-        const drawLabel = (p1, p2) => {
-          const dx = p2.x - p1.x;
-          const dy = p2.y - p1.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-
-          const midX = (p1.x + p2.x) / 2;
-          const midY = (p1.y + p2.y) / 2;
-          const midS = this.toScreen(midX, midY);
-
-          let label = `${Math.round(dist)}m`;
-          if (dist >= 1000) label = `${(dist / 1000).toFixed(1)}km`;
-
-          this.ctx.font = "12px sans-serif";
-          const metrics = this.ctx.measureText(label);
-          const pad = 4;
-
-          this.ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-          this.ctx.fillRect(
-            midS.x - metrics.width / 2 - pad,
-            midS.y - 10 - pad,
-            metrics.width + pad * 2,
-            20,
-          );
-
-          this.ctx.fillStyle = "#fff";
-          this.ctx.textAlign = "center";
-          this.ctx.textBaseline = "middle";
-          this.ctx.fillText(label, midS.x, midS.y - 10);
-        };
-
-        // Existing segments
-        for (let i = 0; i < points.length - 1; i++) {
-          drawLabel(points[i], points[i + 1]);
-        }
-
-        // Active segment (Last -> Mouse)
-        drawLabel(points[points.length - 1], mouseW);
-
-        // Angle Visualization
-        if (points.length >= 2) {
-            const last = points[points.length - 1];
-            const prev = points[points.length - 2];
-            
-            // Vector Prev -> Last
-            const v1 = { x: last.x - prev.x, y: last.y - prev.y };
-            // Vector Last -> Mouse
-            const v2 = { x: mouseW.x - last.x, y: mouseW.y - last.y };
-            
-            const len1 = Math.hypot(v1.x, v1.y);
-            const len2 = Math.hypot(v2.x, v2.y);
-            
-            if (len1 > 0 && len2 > 0) {
-                // Calculate angle
-                const dot = v1.x * v2.x + v1.y * v2.y;
-                const det = v1.x * v2.y - v1.y * v2.x;
-                const rad = Math.atan2(det, dot);
-                let deg = Math.abs(rad * 180 / Math.PI);
+        if (input.landMode === "rect") {
+            // High-End Visual Style Helper
+            const drawStyledLabel = (str, x, y, align = "center", baseline = "middle") => {
+                this.ctx.font = "bold 13px 'Segoe UI', sans-serif";
+                const metrics = this.ctx.measureText(str);
+                const padx = 6;
+                const pady = 4;
+                const w = metrics.width + padx * 2;
+                const h = 20; // fixed height approx
                 
-                // We want the internal angle, usually 180 - deviation
-                // Or just the deviation? Relative snap is deviation (0, 90).
-                // Let's show deviation from straight line (0 deg) or turn angle.
-                // Actually, let's show the "Corner Angle" (interior).
-                // If parallel (straight), angle is 180.
-                // If 90 turn, angle is 90.
+                let bgX = x;
+                let bgY = y - h/2;
                 
-                // Let's use the absolute angle difference relative to previous segment.
-                // v1 angle:
-                const a1 = Math.atan2(v1.y, v1.x);
-                // v2 angle:
-                const a2 = Math.atan2(v2.y, v2.x);
+                if (align === "center") bgX = x - w/2;
+                // Adjust as needed
                 
-                let diff = (a2 - a1) * 180 / Math.PI;
-                // Normalize to -180 to 180
-                while (diff > 180) diff -= 360;
-                while (diff < -180) diff += 360;
+                // Dark Grey Background Box
+                this.ctx.fillStyle = "rgba(30, 41, 59, 0.9)"; // Slate-800
+                this.ctx.fillRect(bgX, bgY, w, h);
                 
-                const absDiff = Math.abs(diff);
-                const displayAngle = Math.round(absDiff);
+                // Text
+                this.ctx.fillStyle = "#ffffff";
+                this.ctx.textAlign = "left"; // Draw relative to box
+                this.ctx.textBaseline = "middle";
+                this.ctx.fillText(str, bgX + padx, bgY + h/2);
+            };
 
-                // Draw Angle Arc
-                const sLast = this.toScreen(last.x, last.y);
-                const radius = 20;
-
+            const drawVertex = (x, y) => {
                 this.ctx.beginPath();
-                this.ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
-                this.ctx.lineWidth = 1;
-                // Draw arc from a1 to a2
-                this.ctx.arc(sLast.x, sLast.y, radius, a1, a2, diff < 0);
+                this.ctx.arc(x, y, 4, 0, Math.PI * 2);
+                this.ctx.fillStyle = "#ffffff";
+                this.ctx.fill();
+                this.ctx.lineWidth = 1.5;
+                this.ctx.strokeStyle = "#1e293b";
+                this.ctx.stroke();
+            };
+
+            // 1 Point: Draw Line to Mouse (Base)
+            if (points.length === 1) {
+                const p1 = points[0];
+                const s1 = this.toScreen(p1.x, p1.y);
+                const s2 = this.toScreen(mouseW.x, mouseW.y);
+                
+                this.ctx.beginPath();
+                this.ctx.moveTo(s1.x, s1.y);
+                this.ctx.lineTo(s2.x, s2.y);
+                this.ctx.strokeStyle = "#facc15"; // Yellow-400
+                this.ctx.lineWidth = 3; 
                 this.ctx.stroke();
 
-                // Draw Text
+                drawVertex(s1.x, s1.y);
+                drawVertex(s2.x, s2.y);
+
+                // Label
+                const dist = Math.hypot(mouseW.x - p1.x, mouseW.y - p1.y);
+                drawStyledLabel(`${Math.round(dist)}m`, (s1.x + s2.x)/2, (s1.y + s2.y)/2);
+            }
+            // 2 Points: Draw Base + Projected Height Box
+            else if (points.length === 2) {
+                const p1 = points[0];
+                const p2 = points[1];
+                
+                // Base Vector
+                const vBaseX = p2.x - p1.x;
+                const vBaseY = p2.y - p1.y;
+                
+                // Perpendicular Unit Vector
+                const perpX = -vBaseY;
+                const perpY = vBaseX;
+                const len = Math.hypot(perpX, perpY);
+                if (len > 0) {
+                    const uPerpX = perpX / len;
+                    const uPerpY = perpY / len;
+                    
+                    // Project Mouse P3 onto Perp
+                    const v3X = mouseW.x - p2.x;
+                    const v3Y = mouseW.y - p2.y;
+                    const dist = v3X * uPerpX + v3Y * uPerpY;
+                    
+                    const offX = uPerpX * dist;
+                    const offY = uPerpY * dist;
+                    
+                    // Calc 4 corners
+                    const c1 = this.toScreen(p1.x, p1.y);
+                    const c2 = this.toScreen(p2.x, p2.y);
+                    const c3 = this.toScreen(p2.x + offX, p2.y + offY);
+                    const c4 = this.toScreen(p1.x + offX, p1.y + offY);
+                    
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(c1.x, c1.y);
+                    this.ctx.lineTo(c2.x, c2.y);
+                    this.ctx.lineTo(c3.x, c3.y);
+                    this.ctx.lineTo(c4.x, c4.y);
+                    this.ctx.closePath();
+                    
+                    this.ctx.fillStyle = "rgba(45, 212, 191, 0.5)"; // Teal-400, 50%
+                    this.ctx.fill();
+                    this.ctx.lineWidth = 3;
+                    this.ctx.strokeStyle = "#facc15"; // Yellow-400
+                    this.ctx.stroke();
+
+                    // Vertices
+                    drawVertex(c1.x, c1.y);
+                    drawVertex(c2.x, c2.y);
+                    drawVertex(c3.x, c3.y);
+                    drawVertex(c4.x, c4.y);
+
+                    // Labels
+                    
+                    // Base (P1-P2)
+                    const distBase = Math.hypot(vBaseX, vBaseY);
+                    drawStyledLabel(`${Math.round(distBase)}m`, (c1.x + c2.x)/2, (c1.y + c2.y)/2);
+                    
+                    // Side (P2-P3)
+                    const distSide = Math.abs(dist);
+                    drawStyledLabel(`${Math.round(distSide)}m`, (c2.x + c3.x)/2, (c2.y + c3.y)/2);
+                }
+            }
+        } 
+        else if (input.landMode === "circle") {
+                // Re-use styled label helper? Or duplicate for scope safely
+                const drawStyledLabel = (str, x, y) => {
+                this.ctx.font = "bold 13px 'Segoe UI', sans-serif";
+                const metrics = this.ctx.measureText(str);
+                const padx = 6;
+                const pady = 4;
+                const w = metrics.width + padx * 2;
+                const h = 20;
+                const bgX = x - w/2;
+                const bgY = y - h/2;
+                this.ctx.fillStyle = "rgba(30, 41, 59, 0.9)";
+                this.ctx.fillRect(bgX, bgY, w, h);
+                this.ctx.fillStyle = "#ffffff";
+                this.ctx.textAlign = "left";
+                this.ctx.textBaseline = "middle";
+                this.ctx.fillText(str, bgX + padx, bgY + h/2);
+            };
+            const drawVertex = (x, y) => {
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, 4, 0, Math.PI * 2);
+                this.ctx.fillStyle = "#ffffff";
+                this.ctx.fill();
+                this.ctx.lineWidth = 1.5;
+                this.ctx.strokeStyle = "#1e293b";
+                this.ctx.stroke();
+            };
+
+            // 1 Point: Center set, dragging Radius
+            if (points.length === 1) {
+                const center = points[0];
+                const sCenter = this.toScreen(center.x, center.y);
+                const r = Math.hypot(mouseW.x - center.x, mouseW.y - center.y);
+                const sR = r * this.scale;
+                
+                this.ctx.beginPath();
+                this.ctx.arc(sCenter.x, sCenter.y, sR, 0, Math.PI * 2);
+                this.ctx.fillStyle = "rgba(45, 212, 191, 0.5)"; // Teal
+                this.ctx.fill();
+                this.ctx.strokeStyle = "#facc15"; // Yellow
+                this.ctx.lineWidth = 3;
+                this.ctx.stroke();
+
+                // Vertex at Center
+                drawVertex(sCenter.x, sCenter.y);
+                
+                // Radius Line
+                const sEdge = this.toScreen(mouseW.x, mouseW.y);
+                this.ctx.beginPath();
+                this.ctx.moveTo(sCenter.x, sCenter.y);
+                this.ctx.lineTo(sEdge.x, sEdge.y);
+                this.ctx.setLineDash([5, 5]);
+                this.ctx.strokeStyle = "#fff"; // Dashed white for radius
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+                this.ctx.setLineDash([]);
+                
+                // Label
+                drawStyledLabel(`R: ${Math.round(r)}m`, (sCenter.x + sEdge.x)/2, (sCenter.y + sEdge.y)/2);
+            }
+        } 
+        else {
+            // Standard Polygon Preview
+            // 1. Fill Preview (Potential Shape)
+            this.ctx.fillStyle = "rgba(74, 222, 128, 0.5)"; // Semi-transparent Land
+            this.ctx.beginPath();
+            const start = this.toScreen(points[0].x, points[0].y);
+            this.ctx.moveTo(start.x, start.y);
+
+            for (let i = 1; i < points.length; i++) {
+                const p = this.toScreen(points[i].x, points[i].y);
+                this.ctx.lineTo(p.x, p.y);
+            }
+
+            // Close shape to Mouse
+            const mouseS = this.toScreen(mouseW.x, mouseW.y);
+            
+            // If closing loop, snap visual to start point
+            if (input.isClosingLoop && points.length > 0) {
+                const startS = this.toScreen(points[0].x, points[0].y);
+                this.ctx.lineTo(startS.x, startS.y);
+            } else {
+                this.ctx.lineTo(mouseS.x, mouseS.y);
+            }
+            
+            this.ctx.closePath();
+            this.ctx.fill();
+
+            // 2. Stroke Line
+            let strokeColor = "#ffffff";
+            if (input.isSnapped) {
+                if (input.snapType === "global")
+                strokeColor = "#fde047"; // Yellow
+                else if (input.snapType === "relative") strokeColor = "#22d3ee"; // Cyan
+            }
+            this.ctx.strokeStyle = strokeColor;
+            this.ctx.lineWidth = 2 * this.scale;
+            this.ctx.stroke(); // Stroke the shape we just filled
+
+            // 3. Draw Dots/Vertices
+            this.ctx.fillStyle = "#fff";
+            for (let i = 0; i < points.length; i++) {
+                const pt = points[i];
+                const s = this.toScreen(pt.x, pt.y);
+                this.ctx.beginPath();
+                
+                // Highlight start point if closing loop
+                if (i === 0 && input.isClosingLoop) {
+                    this.ctx.fillStyle = "#fde047"; // Yellow highlight
+                    this.ctx.arc(s.x, s.y, 8, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.fillStyle = "#fff"; // Reset
+                } else {
+                    this.ctx.arc(s.x, s.y, 4, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+            }
+
+            // 4. Length Labels (For ALL segments)
+            const drawLabel = (p1, p2) => {
+                const dx = p2.x - p1.x;
+                const dy = p2.y - p1.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                const midX = (p1.x + p2.x) / 2;
+                const midY = (p1.y + p2.y) / 2;
+                const midS = this.toScreen(midX, midY);
+
+                let label = `${Math.round(dist)}m`;
+                if (dist >= 1000) label = `${(dist / 1000).toFixed(1)}km`;
+
+                this.ctx.font = "12px sans-serif";
+                const metrics = this.ctx.measureText(label);
+                const pad = 4;
+
+                this.ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+                this.ctx.fillRect(
+                midS.x - metrics.width / 2 - pad,
+                midS.y - 10 - pad,
+                metrics.width + pad * 2,
+                20,
+                );
+
                 this.ctx.fillStyle = "#fff";
-                this.ctx.font = "11px sans-serif";
-                this.ctx.fillText(`${displayAngle}°`, sLast.x + 10, sLast.y - 10);
+                this.ctx.textAlign = "center";
+                this.ctx.textBaseline = "middle";
+                this.ctx.fillText(label, midS.x, midS.y - 10);
+            };
+
+            // Existing segments
+            for (let i = 0; i < points.length - 1; i++) {
+                drawLabel(points[i], points[i + 1]);
+            }
+
+            // Active segment (Last -> Mouse)
+            drawLabel(points[points.length - 1], mouseW);
+
+            // Angle Visualization
+            if (points.length >= 2) {
+                const last = points[points.length - 1];
+                const prev = points[points.length - 2];
+                
+                // Vector Prev -> Last
+                const v1 = { x: last.x - prev.x, y: last.y - prev.y };
+                // Vector Last -> Mouse
+                const v2 = { x: mouseW.x - last.x, y: mouseW.y - last.y };
+                
+                const len1 = Math.hypot(v1.x, v1.y);
+                const len2 = Math.hypot(v2.x, v2.y);
+                
+                if (len1 > 0 && len2 > 0) {
+                    // Calculate angle
+                    const dot = v1.x * v2.x + v1.y * v2.y;
+                    const det = v1.x * v2.y - v1.y * v2.x;
+                    const rad = Math.atan2(det, dot);
+                    // let deg = Math.abs(rad * 180 / Math.PI); // Unused
+                    
+                    // We want the internal angle, usually 180 - deviation
+                    // Or just the deviation? Relative snap is deviation (0, 90).
+                    // Let's show deviation from straight line (0 deg) or turn angle.
+                    // Actually, let's show the "Corner Angle" (interior).
+                    // If parallel (straight), angle is 180.
+                    // If 90 turn, angle is 90.
+                    
+                    // Let's use the absolute angle difference relative to previous segment.
+                    // v1 angle:
+                    const a1 = Math.atan2(v1.y, v1.x);
+                    // v2 angle:
+                    const a2 = Math.atan2(v2.y, v2.x);
+                    
+                    let diff = (a2 - a1) * 180 / Math.PI;
+                    // Normalize to -180 to 180
+                    while (diff > 180) diff -= 360;
+                    while (diff < -180) diff += 360;
+                    
+                    const absDiff = Math.abs(diff);
+                    const displayAngle = Math.round(absDiff);
+
+                    // Draw Angle Arc
+                    const sLast = this.toScreen(last.x, last.y);
+                    const radius = 20;
+
+                    this.ctx.beginPath();
+                    this.ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
+                    this.ctx.lineWidth = 1;
+                    // Draw arc from a1 to a2
+                    this.ctx.arc(sLast.x, sLast.y, radius, a1, a2, diff < 0);
+                    this.ctx.stroke();
+
+                    // Draw Text
+                    this.ctx.fillStyle = "#fff";
+                    this.ctx.font = "11px sans-serif";
+                    this.ctx.fillText(`${displayAngle}°`, sLast.x + 10, sLast.y - 10);
+                }
             }
         }
       }
@@ -299,98 +482,7 @@ export class Renderer {
              this.ctx.moveTo(s.x, s.y);
              this.ctx.lineTo(e.x, e.y);
              this.ctx.stroke();
-        } else if (tool === "land") {
-            // Polygon Preview covers Poly mode via existing input.polyPoints check
-            // We just need to handle specific previews for Rect/Circle steps
-            
-            if (input.landMode === "rect") {
-                const points = input.polyPoints || [];
-                // 1 Point: Draw Line to Mouse (Base)
-                if (points.length === 1) {
-                    const p1 = points[0];
-                    const s1 = this.toScreen(p1.x, p1.y);
-                    const s2 = this.toScreen(curW.x, curW.y);
-                    
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(s1.x, s1.y);
-                    this.ctx.lineTo(s2.x, s2.y);
-                    this.ctx.strokeStyle = "#fff";
-                    this.ctx.lineWidth = 2 * this.scale;
-                    this.ctx.stroke();
-                }
-                // 2 Points: Draw Base + Projected Height Box
-                else if (points.length === 2) {
-                    const p1 = points[0];
-                    const p2 = points[1];
-                    
-                    // Base Vector
-                    const vBaseX = p2.x - p1.x;
-                    const vBaseY = p2.y - p1.y;
-                    
-                    // Perpendicular Unit Vector
-                    const perpX = -vBaseY;
-                    const perpY = vBaseX;
-                    const len = Math.hypot(perpX, perpY);
-                    if (len > 0) {
-                        const uPerpX = perpX / len;
-                        const uPerpY = perpY / len;
-                        
-                        // Project Mouse P3 onto Perp
-                        const v3X = curW.x - p2.x;
-                        const v3Y = curW.y - p2.y;
-                        const dist = v3X * uPerpX + v3Y * uPerpY;
-                        
-                        const offX = uPerpX * dist;
-                        const offY = uPerpY * dist;
-                        
-                        // Calc 4 corners
-                        const c1 = this.toScreen(p1.x, p1.y);
-                        const c2 = this.toScreen(p2.x, p2.y);
-                        const c3 = this.toScreen(p2.x + offX, p2.y + offY);
-                        const c4 = this.toScreen(p1.x + offX, p1.y + offY);
-                        
-                        this.ctx.beginPath();
-                        this.ctx.moveTo(c1.x, c1.y);
-                        this.ctx.lineTo(c2.x, c2.y);
-                        this.ctx.lineTo(c3.x, c3.y);
-                        this.ctx.lineTo(c4.x, c4.y);
-                        this.ctx.closePath();
-                        
-                        this.ctx.fillStyle = "rgba(74, 222, 128, 0.3)";
-                        this.ctx.fill();
-                        this.ctx.strokeStyle = "#fff";
-                        this.ctx.stroke();
-                    }
-                }
-            } 
-            else if (input.landMode === "circle") {
-                const points = input.polyPoints || [];
-                // 1 Point: Center set, dragging Radius
-                if (points.length === 1) {
-                    const center = points[0];
-                    const sCenter = this.toScreen(center.x, center.y);
-                    const r = Math.hypot(curW.x - center.x, curW.y - center.y);
-                    const sR = r * this.scale;
-                    
-                    this.ctx.beginPath();
-                    this.ctx.arc(sCenter.x, sCenter.y, sR, 0, Math.PI * 2);
-                    this.ctx.fillStyle = "rgba(74, 222, 128, 0.3)";
-                    this.ctx.fill();
-                    this.ctx.strokeStyle = "#fff";
-                    this.ctx.stroke();
-                    
-                    // Draw radius line
-                    const sMouse = this.toScreen(curW.x, curW.y);
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(sCenter.x, sCenter.y);
-                    this.ctx.lineTo(sMouse.x, sMouse.y);
-                    this.ctx.setLineDash([5, 5]);
-                    this.ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
-                    this.ctx.stroke();
-                    this.ctx.setLineDash([]);
-                }
-            }
-        }
+        } 
       }
     }
   }
