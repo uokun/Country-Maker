@@ -15,6 +15,7 @@ export class Input {
 
     // Polygon Tool State (for Land)
     this.polyPoints = [];
+    this.landMode = "poly"; // poly, rect, circle
 
     this.keys = {};
 
@@ -39,6 +40,7 @@ export class Input {
       this.keys[e.code] = false;
       if (e.code === "Escape") this.cancelPoly();
       if (e.code === "Enter") this.finishPoly();
+      if (e.code === "Backspace" || e.code === "Delete") this.undoLastPoint();
     });
 
     // UI Buttons
@@ -47,6 +49,9 @@ export class Input {
 
     const btnFinish = document.getElementById("btn-finish-poly");
     if (btnFinish) btnFinish.addEventListener("click", () => this.finishPoly());
+    
+    const btnUndo = document.getElementById("btn-undo-poly");
+    if (btnUndo) btnUndo.addEventListener("click", () => this.undoLastPoint());
   }
 
   getMousePos(e) {
@@ -84,18 +89,42 @@ export class Input {
       if (this.game.activeTool === "road") {
         this.dragStart = w;
       }
-      // Land Tool (Polygon Click)
+      // Land Tool
       else if (this.game.activeTool === "land") {
-        this.polyPoints.push(w);
-        this.updatePolyUI();
-
-        if (this.polyPoints.length > 2) {
-          const first = this.polyPoints[0];
-          const dx = w.x - first.x;
-          const dy = w.y - first.y;
-          if (Math.hypot(dx, dy) < 20 / this.renderer.scale) {
-            this.finishPoly();
-          }
+        // Common: Use snapped position
+        const p = this.currentMouseWorld;
+        
+        if (this.landMode === "rect") {
+            // 3-Click Rectangle
+            // 1. Start Point
+            // 2. Width Vector (Base Line)
+            // 3. Height (Perpendicular distance)
+            this.polyPoints.push({ x: p.x, y: p.y });
+            
+            if (this.polyPoints.length === 3) {
+                this.finishRect();
+            }
+        } else if (this.landMode === "circle") {
+            // 2-Click Circle
+            // 1. Center
+            // 2. Radius Point
+            this.polyPoints.push({ x: p.x, y: p.y });
+            
+            if (this.polyPoints.length === 2) {
+                this.finishCircle();
+            }
+        } else {
+            // Poly Mode
+            this.polyPoints.push({ x: p.x, y: p.y });
+            this.updatePolyUI(); // Actually deprecated but keeps state clean? Reference implementation empty.
+    
+            if (this.polyPoints.length > 2) {
+              const first = this.polyPoints[0];
+              // Use isClosingLoop flag logic here
+              if (this.isClosingLoop) {
+                this.finishPoly();
+              }
+            }
         }
       }
       // Brush Tool (Paint)
@@ -114,6 +143,15 @@ export class Input {
     }
   }
 
+  setLandMode(mode) {
+      this.landMode = mode;
+      // Reset state if switching
+      this.polyPoints = [];
+      this.dragStart = null;
+      this.isClosingLoop = false;
+      this.updatePolyUI();
+  }
+
   onMouseMove(e) {
     const m = this.getMousePos(e);
     let w = this.renderer.toWorld(m.x, m.y);
@@ -125,6 +163,15 @@ export class Input {
     if (this.game.activeTool === "land" && this.polyPoints.length > 0) {
       const last = this.polyPoints[this.polyPoints.length - 1];
       const snapThresh = 20 / this.renderer.scale;
+      
+      // Check for closing loop
+      if (this.polyPoints.length > 2) {
+        const first = this.polyPoints[0];
+        const distToStart = Math.hypot(w.x - first.x, w.y - first.y);
+        this.isClosingLoop = distToStart < snapThresh;
+      } else {
+        this.isClosingLoop = false;
+      }
 
       let bestDist = snapThresh;
       let snapCandidate = null; // {x, y, type}
@@ -245,6 +292,12 @@ export class Input {
     const m = this.getMousePos(e);
     const w = this.renderer.toWorld(m.x, m.y);
 
+    // Land Shape Creation (Drag) - Deprecated / Removed
+    // Logic is now in onMouseDown via finishRect/finishCircle
+    
+    // Cleanup any lingering dragStart just in case
+    this.dragStart = null;
+
     if (this.game.activeTool === "road" && this.dragStart) {
       const dx = w.x - this.dragStart.x;
       const dy = w.y - this.dragStart.y;
@@ -256,11 +309,7 @@ export class Input {
   }
 
   updatePolyUI() {
-    const el = document.getElementById("poly-controls");
-    if (el) {
-      if (this.polyPoints.length > 0) el.classList.remove("hidden");
-      else el.classList.add("hidden");
-    }
+    // Deprecated: UI is now handled by side panel buttons
   }
 
   cancelPoly() {
@@ -272,7 +321,96 @@ export class Input {
     if (this.polyPoints.length > 2) {
       this.game.createLand(this.polyPoints);
       this.polyPoints = [];
+      this.isClosingLoop = false;
       this.updatePolyUI();
     }
   }
-}
+
+  undoLastPoint() {
+    if (this.polyPoints.length > 0) {
+      this.polyPoints.pop();
+      this.isClosingLoop = false;
+  finishRect() {
+      if (this.polyPoints.length !== 3) return;
+      const p1 = this.polyPoints[0];
+      const p2 = this.polyPoints[1];
+      const p3 = this.polyPoints[2];
+      
+      // Vector p1->p2
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      
+      // We need to project p3 onto the line perpendicular to p1-p2 to find the "height" vector
+      // Or simply: The rectangle is defined by Base(p1, p2) and the component of Vector(p2, p3) perpendicular to Base.
+      // Actually simpler:
+      // We want a rectangle where one side is P1->P2.
+      // The other side length is determined by P3's distance from the line P1-P2.
+      // AND P3 projects the "far side".
+      
+      // Let vBase = P2 - P1.
+      // Let vHeight = P3 - P2 (but projected to be perpendicular to vBase? No, just P3 determines the offset)
+      // Standard rotated rect logic:
+      // P1, P2 are corners. P3 determines the thickness/height.
+      // We project (P3 - P2) onto perpendicular of (P1 - P2).
+      
+      const vBaseX = p2.x - p1.x;
+      const vBaseY = p2.y - p1.y;
+      
+      // Perpendicular vector (rotated 90 deg)
+      const perpX = -vBaseY;
+      const perpY = vBaseX;
+      
+      // Normalize perp
+      const len = Math.hypot(perpX, perpY);
+      if (len === 0) return; // p1 == p2
+      const uPerpX = perpX / len;
+      const uPerpY = perpY / len;
+      
+      // Vector P2 -> P3
+      const v3X = p3.x - p2.x;
+      const v3Y = p3.y - p2.y;
+      
+      // Project P2->P3 onto UnitPerp
+      const dist = v3X * uPerpX + v3Y * uPerpY;
+      
+      // The Offset Vector
+      const offX = uPerpX * dist;
+      const offY = uPerpY * dist;
+      
+      // 4 Points:
+      // 1. P1
+      // 2. P2
+      // 3. P2 + Offset
+      // 4. P1 + Offset
+      
+      const corners = [
+          { x: p1.x, y: p1.y },
+          { x: p2.x, y: p2.y },
+          { x: p2.x + offX, y: p2.y + offY },
+          { x: p1.x + offX, y: p1.y + offY }
+      ];
+      
+      this.game.createLand(corners);
+      this.polyPoints = [];
+  }
+
+  finishCircle() {
+      if (this.polyPoints.length !== 2) return;
+      const center = this.polyPoints[0];
+      const edge = this.polyPoints[1];
+      
+      const r = Math.hypot(edge.x - center.x, edge.y - center.y);
+      if (r > 1) {
+        const segments = 64; // Higher quality
+        const points = [];
+        for (let i = 0; i < segments; i++) {
+            const angle = (i / segments) * Math.PI * 2;
+            points.push({
+                x: center.x + Math.cos(angle) * r,
+                y: center.y + Math.sin(angle) * r
+            });
+        }
+        this.game.createLand(points);
+      }
+      this.polyPoints = [];
+  }

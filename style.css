@@ -322,3 +322,180 @@ canvas {
 .control-btn.finish {
   background: #22c55e; /* Green */
 }
+
+/* Side Settings Panel */
+.side-panel {
+  position: absolute;
+  top: 80px;
+  left: 20px;
+  width: 280px;
+  background: var(--bg-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-glass);
+  border-radius: 16px;
+  padding: 16px;
+  color: white;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+  z-index: 2000; /* Ensure above all else */
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: auto; /* Allow interaction */
+}
+
+.side-panel.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-20px);
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-glass);
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+}
+
+#panel-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+#btn-close-panel {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+#btn-close-panel:hover {
+  color: white;
+}
+
+.panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.section-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+  letter-spacing: 0.5px;
+}
+
+/* Improved Toggle Switch */
+.panel-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+}
+
+.panel-row label {
+  font-size: 13px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.checkbox-visual {
+  width: 44px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.checkbox-visual::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 18px;
+  height: 18px;
+  background: white;
+  border-radius: 50%;
+  transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+input[type="checkbox"]:checked + .checkbox-visual {
+  background: var(--accent); /* Cyan accent */
+  border-color: var(--accent);
+}
+
+input[type="checkbox"]:checked + .checkbox-visual::after {
+  transform: translateX(20px);
+}
+
+input[type="checkbox"] {
+  display: none;
+}
+
+/* Panel Buttons Grid */
+.panel-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.panel-btn {
+  padding: 8px;
+  border: 1px solid var(--border-glass);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  color: white;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  pointer-events: auto;
+  position: relative;
+  z-index: 2001;
+}
+
+.panel-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.panel-btn.primary {
+  background: rgba(76, 201, 240, 0.2);
+  border-color: var(--accent);
+  color: var(--accent);
+  grid-column: span 2; /* Full width */
+}
+
+.panel-btn.primary:hover {
+  background: rgba(76, 201, 240, 0.3);
+}
+
+.panel-btn.danger:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+}
+.panel-btn.active {
+  background: var(--tool-active-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 8px rgba(76, 201, 240, 0.2);
+}

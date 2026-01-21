@@ -29,6 +29,16 @@
             <small>人</small>
           </div>
         </header>
+        
+        <div id="side-panel" class="side-panel hidden">
+            <div class="panel-header">
+                <span id="panel-title">設定</span>
+                <button id="btn-close-panel" title="閉じる">×</button>
+            </div>
+            <div id="panel-content" class="panel-content">
+                <!-- Dynamic Content Here -->
+            </div>
+        </div>
 
         <div class="dock-container">
           <div class="toolbar">
@@ -85,28 +95,7 @@
               </button>
             </div>
 
-            <!-- Snap Settings -->
-            <div
-              class="tool-group"
-              style="
-                padding-left: 10px;
-                border-left: 1px solid var(--border-glass);
-              "
-            >
-              <div class="snap-toggles">
-                <label class="toggle-label" title="マップの縦横軸に合わせる">
-                  <input type="checkbox" id="chk-snap-global" checked />
-                  <span>🌐</span>
-                </label>
-                <label
-                  class="toggle-label"
-                  title="直前の線に対して直角・並行に合わせる"
-                >
-                  <input type="checkbox" id="chk-snap-relative" checked />
-                  <span>📐</span>
-                </label>
-              </div>
-            </div>
+            <!-- Snap Settings moved to Side Panel -->
 
             <div class="tool-group actions">
               <button class="action-btn" id="btn-save" title="保存">
@@ -121,7 +110,7 @@
 
         <div class="status-bar">
           <span id="coords-display">X: 0, Y: 0</span>
-          <span id="scale-display" style="margin-left: 10px">Scale: 1:1</span>
+          <span id="scale-display" style="margin-left: 10px">縮尺: 1:1</span>
           <div
             id="scale-bar-container"
             style="
@@ -147,23 +136,7 @@
         </div>
 
         <!-- Polygon Controls (Floating) -->
-        <div id="poly-controls" class="poly-controls hidden">
-          <div class="control-sep"></div>
-          <button
-            id="btn-cancel-poly"
-            class="control-btn cancel"
-            title="キャンセル (Esc)"
-          >
-            ✖ キャンセル (Esc)
-          </button>
-          <button
-            id="btn-finish-poly"
-            class="control-btn finish"
-            title="完了 (Enter)"
-          >
-            ✔ 始点に接続 (Enter)
-          </button>
-        </div>
+        <!-- Floating Controls Removed -->
       </div>
     </div>
 

@@ -128,7 +128,15 @@ export class Renderer {
 
         // Close shape to Mouse
         const mouseS = this.toScreen(mouseW.x, mouseW.y);
-        this.ctx.lineTo(mouseS.x, mouseS.y);
+        
+        // If closing loop, snap visual to start point
+        if (input.isClosingLoop && points.length > 0) {
+            const startS = this.toScreen(points[0].x, points[0].y);
+            this.ctx.lineTo(startS.x, startS.y);
+        } else {
+            this.ctx.lineTo(mouseS.x, mouseS.y);
+        }
+        
         this.ctx.closePath();
         this.ctx.fill();
 
@@ -145,11 +153,21 @@ export class Renderer {
 
         // 3. Draw Dots/Vertices
         this.ctx.fillStyle = "#fff";
-        for (const pt of points) {
-          const s = this.toScreen(pt.x, pt.y);
-          this.ctx.beginPath();
-          this.ctx.arc(s.x, s.y, 4, 0, Math.PI * 2);
-          this.ctx.fill();
+        for (let i = 0; i < points.length; i++) {
+            const pt = points[i];
+            const s = this.toScreen(pt.x, pt.y);
+            this.ctx.beginPath();
+            
+            // Highlight start point if closing loop
+            if (i === 0 && input.isClosingLoop) {
+                this.ctx.fillStyle = "#fde047"; // Yellow highlight
+                this.ctx.arc(s.x, s.y, 8, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.fillStyle = "#fff"; // Reset
+            } else {
+                this.ctx.arc(s.x, s.y, 4, 0, Math.PI * 2);
+                this.ctx.fill();
+            }
         }
 
         // 4. Length Labels (For ALL segments)
@@ -190,6 +208,65 @@ export class Renderer {
 
         // Active segment (Last -> Mouse)
         drawLabel(points[points.length - 1], mouseW);
+
+        // Angle Visualization
+        if (points.length >= 2) {
+            const last = points[points.length - 1];
+            const prev = points[points.length - 2];
+            
+            // Vector Prev -> Last
+            const v1 = { x: last.x - prev.x, y: last.y - prev.y };
+            // Vector Last -> Mouse
+            const v2 = { x: mouseW.x - last.x, y: mouseW.y - last.y };
+            
+            const len1 = Math.hypot(v1.x, v1.y);
+            const len2 = Math.hypot(v2.x, v2.y);
+            
+            if (len1 > 0 && len2 > 0) {
+                // Calculate angle
+                const dot = v1.x * v2.x + v1.y * v2.y;
+                const det = v1.x * v2.y - v1.y * v2.x;
+                const rad = Math.atan2(det, dot);
+                let deg = Math.abs(rad * 180 / Math.PI);
+                
+                // We want the internal angle, usually 180 - deviation
+                // Or just the deviation? Relative snap is deviation (0, 90).
+                // Let's show deviation from straight line (0 deg) or turn angle.
+                // Actually, let's show the "Corner Angle" (interior).
+                // If parallel (straight), angle is 180.
+                // If 90 turn, angle is 90.
+                
+                // Let's use the absolute angle difference relative to previous segment.
+                // v1 angle:
+                const a1 = Math.atan2(v1.y, v1.x);
+                // v2 angle:
+                const a2 = Math.atan2(v2.y, v2.x);
+                
+                let diff = (a2 - a1) * 180 / Math.PI;
+                // Normalize to -180 to 180
+                while (diff > 180) diff -= 360;
+                while (diff < -180) diff += 360;
+                
+                const absDiff = Math.abs(diff);
+                const displayAngle = Math.round(absDiff);
+
+                // Draw Angle Arc
+                const sLast = this.toScreen(last.x, last.y);
+                const radius = 20;
+
+                this.ctx.beginPath();
+                this.ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
+                this.ctx.lineWidth = 1;
+                // Draw arc from a1 to a2
+                this.ctx.arc(sLast.x, sLast.y, radius, a1, a2, diff < 0);
+                this.ctx.stroke();
+
+                // Draw Text
+                this.ctx.fillStyle = "#fff";
+                this.ctx.font = "11px sans-serif";
+                this.ctx.fillText(`${displayAngle}°`, sLast.x + 10, sLast.y - 10);
+            }
+        }
       }
 
       // Road Drag Preview
@@ -199,22 +276,121 @@ export class Renderer {
         // But input.dragStart is only set for road currently in my logic?
         // Actually dragStart is used for Pan? No, Pan flag is isPanning.
 
-        // Let's assume dragStart means Road for now based on Input.js logic
+        // Update: Now dragStart is used for Land (Rect/Circle) too.
+        // We need to distinguish based on input.game.activeTool? 
+        // We don't have access to game here easily, maybe input.game?
+        // Input has reference to Game. Renderer doesn't strictly know Game structure in constructor but Input passed in draw(timestamp, input).
+        
+        const tool = input.game.activeTool;
+        const startW = input.dragStart;
+        const curW = input.currentMouseWorld;
+        
+        const s = this.toScreen(startW.x, startW.y);
+        const e = this.toScreen(curW.x, curW.y);
+        
+        this.ctx.lineWidth = 2 * this.scale;
+        this.ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+        this.ctx.fillStyle = "rgba(74, 222, 128, 0.3)"; // Faint Land Green
 
-        // Wait, Input.js:
-        // if (this.game.activeTool === 'road') { this.dragStart = w; }
-
-        this.ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
-        this.ctx.lineWidth = 20 * this.scale;
-        this.ctx.beginPath();
-        const s = this.toScreen(input.dragStart.x, input.dragStart.y);
-        const e = this.toScreen(
-          input.currentMouseWorld.x,
-          input.currentMouseWorld.y,
-        );
-        this.ctx.moveTo(s.x, s.y);
-        this.ctx.lineTo(e.x, e.y);
-        this.ctx.stroke();
+        if (tool === "road") {
+             this.ctx.lineWidth = 20 * this.scale;
+             this.ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+             this.ctx.beginPath();
+             this.ctx.moveTo(s.x, s.y);
+             this.ctx.lineTo(e.x, e.y);
+             this.ctx.stroke();
+        } else if (tool === "land") {
+            // Polygon Preview covers Poly mode via existing input.polyPoints check
+            // We just need to handle specific previews for Rect/Circle steps
+            
+            if (input.landMode === "rect") {
+                const points = input.polyPoints || [];
+                // 1 Point: Draw Line to Mouse (Base)
+                if (points.length === 1) {
+                    const p1 = points[0];
+                    const s1 = this.toScreen(p1.x, p1.y);
+                    const s2 = this.toScreen(curW.x, curW.y);
+                    
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(s1.x, s1.y);
+                    this.ctx.lineTo(s2.x, s2.y);
+                    this.ctx.strokeStyle = "#fff";
+                    this.ctx.lineWidth = 2 * this.scale;
+                    this.ctx.stroke();
+                }
+                // 2 Points: Draw Base + Projected Height Box
+                else if (points.length === 2) {
+                    const p1 = points[0];
+                    const p2 = points[1];
+                    
+                    // Base Vector
+                    const vBaseX = p2.x - p1.x;
+                    const vBaseY = p2.y - p1.y;
+                    
+                    // Perpendicular Unit Vector
+                    const perpX = -vBaseY;
+                    const perpY = vBaseX;
+                    const len = Math.hypot(perpX, perpY);
+                    if (len > 0) {
+                        const uPerpX = perpX / len;
+                        const uPerpY = perpY / len;
+                        
+                        // Project Mouse P3 onto Perp
+                        const v3X = curW.x - p2.x;
+                        const v3Y = curW.y - p2.y;
+                        const dist = v3X * uPerpX + v3Y * uPerpY;
+                        
+                        const offX = uPerpX * dist;
+                        const offY = uPerpY * dist;
+                        
+                        // Calc 4 corners
+                        const c1 = this.toScreen(p1.x, p1.y);
+                        const c2 = this.toScreen(p2.x, p2.y);
+                        const c3 = this.toScreen(p2.x + offX, p2.y + offY);
+                        const c4 = this.toScreen(p1.x + offX, p1.y + offY);
+                        
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(c1.x, c1.y);
+                        this.ctx.lineTo(c2.x, c2.y);
+                        this.ctx.lineTo(c3.x, c3.y);
+                        this.ctx.lineTo(c4.x, c4.y);
+                        this.ctx.closePath();
+                        
+                        this.ctx.fillStyle = "rgba(74, 222, 128, 0.3)";
+                        this.ctx.fill();
+                        this.ctx.strokeStyle = "#fff";
+                        this.ctx.stroke();
+                    }
+                }
+            } 
+            else if (input.landMode === "circle") {
+                const points = input.polyPoints || [];
+                // 1 Point: Center set, dragging Radius
+                if (points.length === 1) {
+                    const center = points[0];
+                    const sCenter = this.toScreen(center.x, center.y);
+                    const r = Math.hypot(curW.x - center.x, curW.y - center.y);
+                    const sR = r * this.scale;
+                    
+                    this.ctx.beginPath();
+                    this.ctx.arc(sCenter.x, sCenter.y, sR, 0, Math.PI * 2);
+                    this.ctx.fillStyle = "rgba(74, 222, 128, 0.3)";
+                    this.ctx.fill();
+                    this.ctx.strokeStyle = "#fff";
+                    this.ctx.stroke();
+                    
+                    // Draw radius line
+                    const sMouse = this.toScreen(curW.x, curW.y);
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(sCenter.x, sCenter.y);
+                    this.ctx.lineTo(sMouse.x, sMouse.y);
+                    this.ctx.setLineDash([5, 5]);
+                    this.ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+                    this.ctx.stroke();
+                    this.ctx.setLineDash([]);
+                }
+            }
+        }
       }
     }
   }
